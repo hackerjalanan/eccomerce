@@ -1,273 +1,741 @@
 const cart = {};
 
-  function fmtRupiah(n){
-    return "Rp " + n.toLocaleString("id-ID");
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function fmtRupiah(value) {
+  return "Rp " + Number(value).toLocaleString("id-ID");
+}
+
+function keyFor(itemId, variantKey) {
+  return `${itemId}__${variantKey}`;
+}
+
+function findVariant(itemId, variantKey) {
+  const item = MENU.find((m) => m.id === itemId);
+
+  if (!item) {
+    return { item: null, variant: null };
   }
 
-  function keyFor(itemId, variantKey){
-    return itemId + "__" + variantKey;
-  }
+  return {
+    item,
+    variant: item.variants.find((v) => v.key === variantKey) || null,
+  };
+}
 
-  function findVariant(itemId, variantKey){
-    const item = MENU.find(m => m.id === itemId);
-    if(!item) return { item:null, variant:null };
-    const variant = item.variants.find(v => v.key === variantKey);
-    return { item, variant };
-  }
+function escapeHTML(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
-  function renderMenu(){
-    const list = document.getElementById("menuList");
-    list.innerHTML = "";
 
-    MENU.forEach(item => {
-      const card = document.createElement("article");
-      card.className = "item-card";
+/* =========================================================
+   MENU
+========================================================= */
 
-      const photo = document.createElement("div");
-      photo.className = "item-photo";
+function renderMenu() {
+  const list = document.getElementById("menuList");
 
-      const img = document.createElement("img");
-      img.src = item.img;
-      img.alt = item.name;
-      img.loading = "lazy";
-      img.onerror = () => {
-        img.style.display = "none";
-        photo.style.background =
-          "linear-gradient(135deg, #f5d4dc, #ead8b6)";
-      };
+  if (!list) return;
 
-      photo.appendChild(img);
+  list.innerHTML = "";
 
-      const body = document.createElement("div");
-      body.className = "item-body";
+  MENU.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "item-card";
 
-      const name = document.createElement("h3");
-      name.className = "item-name";
-      name.textContent = item.name;
+    const photo = document.createElement("div");
+    photo.className = "item-photo";
 
-      const desc = document.createElement("p");
-      desc.className = "item-desc";
-      desc.textContent = item.description;
+    const img = document.createElement("img");
+    img.src = item.img;
+    img.alt = item.name;
+    img.loading = "lazy";
 
-      const variantList = document.createElement("div");
-      variantList.className = "variant-list";
+    img.onerror = () => {
+      img.style.display = "none";
+      photo.style.background =
+        "linear-gradient(135deg, #f5d4dc, #ead8b6)";
+    };
 
-      item.variants.forEach(v => {
-        const row = document.createElement("div");
-        row.className = "variant-row";
+    photo.appendChild(img);
 
-        const meta = document.createElement("div");
-        meta.className = "variant-meta";
+    const body = document.createElement("div");
+    body.className = "item-body";
 
-        const label = document.createElement("div");
-        label.className = "variant-label";
-        label.textContent = v.label;
+    const name = document.createElement("h3");
+    name.className = "item-name";
+    name.textContent = item.name;
 
-        const price = document.createElement("div");
-        price.className = "variant-price";
-        price.textContent = "Porsi • " + fmtRupiah(v.price);
+    const desc = document.createElement("p");
+    desc.className = "item-desc";
+    desc.textContent = item.description;
 
-        meta.append(label, price);
+    const variantList = document.createElement("div");
+    variantList.className = "variant-list";
 
-        const stepper = document.createElement("div");
-        stepper.className = "stepper";
+    item.variants.forEach((variant) => {
+      const row = document.createElement("div");
+      row.className = "variant-row";
 
-        const minusBtn = document.createElement("button");
-        minusBtn.type = "button";
-        minusBtn.textContent = "−";
-        minusBtn.setAttribute("aria-label", "Kurangi " + item.name + " " + v.label);
+      const meta = document.createElement("div");
+      meta.className = "variant-meta";
 
-        const qtySpan = document.createElement("span");
-        qtySpan.className = "qty";
-        qtySpan.textContent = "0";
-        qtySpan.setAttribute("aria-live", "polite");
+      const label = document.createElement("div");
+      label.className = "variant-label";
+      label.textContent = variant.label;
 
-        const addBtn = document.createElement("button");
-        addBtn.type = "button";
-        addBtn.className = "add";
-        addBtn.textContent = "+";
-        addBtn.setAttribute("aria-label", "Tambah " + item.name + " " + v.label);
+      const price = document.createElement("div");
+      price.className = "variant-price";
+      price.textContent = `Porsi • ${fmtRupiah(variant.price)}`;
 
-        const k = keyFor(item.id, v.key);
+      meta.append(label, price);
 
-        function refreshQty(){
-          const q = cart[k] || 0;
-          qtySpan.textContent = q;
-          minusBtn.style.visibility = q > 0 ? "visible" : "hidden";
-          qtySpan.style.visibility = q > 0 ? "visible" : "hidden";
+      const stepper = document.createElement("div");
+      stepper.className = "stepper";
+
+      const minusBtn = document.createElement("button");
+      minusBtn.type = "button";
+      minusBtn.textContent = "−";
+
+      const qty = document.createElement("span");
+      qty.className = "qty";
+      qty.textContent = "0";
+      qty.setAttribute("aria-live", "polite");
+
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "add";
+      addBtn.textContent = "+";
+
+      const key = keyFor(item.id, variant.key);
+
+      function refreshQty() {
+        const value = cart[key] || 0;
+
+        qty.textContent = value;
+        minusBtn.style.visibility = value > 0 ? "visible" : "hidden";
+        qty.style.visibility = value > 0 ? "visible" : "hidden";
+      }
+
+      addBtn.addEventListener("click", () => {
+        cart[key] = (cart[key] || 0) + 1;
+
+        refreshQty();
+        updateCartBar();
+
+        addBtn.classList.remove("cart-bump");
+        void addBtn.offsetWidth;
+        addBtn.classList.add("cart-bump");
+      });
+
+      minusBtn.addEventListener("click", () => {
+        cart[key] = Math.max(0, (cart[key] || 0) - 1);
+
+        if (cart[key] === 0) {
+          delete cart[key];
         }
 
         refreshQty();
-
-        addBtn.addEventListener("click", () => {
-          cart[k] = (cart[k] || 0) + 1;
-          refreshQty();
-          updateCartBar();
-          addBtn.classList.remove("cart-bump");
-          void addBtn.offsetWidth;
-          addBtn.classList.add("cart-bump");
-        });
-
-        minusBtn.addEventListener("click", () => {
-          cart[k] = Math.max(0, (cart[k] || 0) - 1);
-          if(cart[k] === 0) delete cart[k];
-          refreshQty();
-          updateCartBar();
-        });
-
-        stepper.append(minusBtn, qtySpan, addBtn);
-        row.append(meta, stepper);
-        variantList.appendChild(row);
+        updateCartBar();
       });
 
-      body.append(name, desc, variantList);
-      card.append(photo, body);
-      list.appendChild(card);
-    });
-  }
+      refreshQty();
 
-  function getCartSummary(){
-    let totalQty = 0;
-    let totalPrice = 0;
-    const lines = [];
-
-    Object.entries(cart).forEach(([k, qty]) => {
-      const [itemId, variantKey] = k.split("__");
-      const { item, variant } = findVariant(itemId, variantKey);
-      if(!item || !variant || qty <= 0) return;
-
-      const subtotal = qty * variant.price;
-      totalQty += qty;
-      totalPrice += subtotal;
-      lines.push({ item, variant, qty, subtotal });
+      stepper.append(minusBtn, qty, addBtn);
+      row.append(meta, stepper);
+      variantList.appendChild(row);
     });
 
-    return { totalQty, totalPrice, lines };
+    body.append(name, desc, variantList);
+    card.append(photo, body);
+    list.appendChild(card);
+  });
+}
+
+
+/* =========================================================
+   CART SUMMARY
+========================================================= */
+
+function getCartSummary() {
+  let totalQty = 0;
+  let totalPrice = 0;
+  const lines = [];
+
+  Object.entries(cart).forEach(([key, qty]) => {
+    const [itemId, variantKey] = key.split("__");
+    const { item, variant } = findVariant(itemId, variantKey);
+
+    if (!item || !variant || qty <= 0) return;
+
+    const subtotal = qty * variant.price;
+
+    totalQty += qty;
+    totalPrice += subtotal;
+
+    lines.push({
+      item,
+      variant,
+      qty,
+      subtotal,
+    });
+  });
+
+  return {
+    totalQty,
+    totalPrice,
+    lines,
+  };
+}
+
+
+/* =========================================================
+   CART BAR
+========================================================= */
+
+function updateCartBar() {
+  const bar = document.getElementById("cartbar");
+  const count = document.getElementById("cartCount");
+  const total = document.getElementById("cartTotal");
+
+  if (!bar || !count || !total) return;
+
+  const { totalQty, totalPrice } = getCartSummary();
+
+  if (totalQty > 0) {
+    count.textContent = `${totalQty} item`;
+    total.textContent = fmtRupiah(totalPrice);
+    bar.classList.add("show");
+  } else {
+    bar.classList.remove("show");
   }
+}
 
-  function updateCartBar(){
-    const bar = document.getElementById("cartbar");
-    const countEl = document.getElementById("cartCount");
-    const totalEl = document.getElementById("cartTotal");
 
-    const { totalQty, totalPrice } = getCartSummary();
+/* =========================================================
+   CHECKOUT DATA
+========================================================= */
 
-    if(totalQty > 0){
-      countEl.textContent = totalQty + (totalQty === 1 ? " item" : " item");
-      totalEl.textContent = fmtRupiah(totalPrice);
-      bar.classList.add("show");
-    }else{
-      bar.classList.remove("show");
-    }
+function getCheckoutData() {
+  return {
+    name:
+      document.getElementById("checkoutName")?.value.trim() || "",
 
-    renderCartSheet();
-  }
+    method:
+      document.querySelector(
+        'input[name="deliveryMethod"]:checked'
+      )?.value || "",
 
-  /* =========================================================
-     CART SHEET / EMPTY STATE
-  ========================================================= */
-  function renderCartSheet(){
-    const body = document.getElementById("sheetBody");
-    const { totalQty, totalPrice, lines } = getCartSummary();
+    address:
+      document.getElementById("checkoutAddress")?.value.trim() || "",
 
-    if(lines.length === 0){
-      body.innerHTML = `
-        <div class="sheet-empty">
-          <div class="empty-icon">🛍</div>
-          <strong>Keranjang masih kosong</strong>
-          <p>Pilih menu favoritmu dulu, lalu atur jumlah porsinya di halaman menu.</p>
-          <button class="btn btn-primary" type="button" id="emptyMenuBtn" style="margin-top:16px;background:var(--maroon);color:var(--cream);">
-            Lihat Menu
-          </button>
-        </div>
-      `;
-      document.getElementById("emptyMenuBtn").addEventListener("click", () => {
-        closeCartSheet();
-        document.getElementById("menu").scrollIntoView({behavior:"smooth"});
-      });
-      return;
-    }
+    note:
+      document.getElementById("checkoutNote")?.value.trim() || "",
+  };
+}
 
+
+/* =========================================================
+   CHECKOUT FORM
+========================================================= */
+
+function renderCheckoutForm() {
+  const body = document.getElementById("sheetBody");
+
+  if (!body) return;
+
+  const summary = getCartSummary();
+
+  if (!summary.lines.length) {
     body.innerHTML = `
-      <div>
-        ${lines.map(line => `
-          <div class="cart-line">
-            <div class="cart-line-info">
-              <strong>${escapeHTML(line.item.name)}</strong>
-              <span>${escapeHTML(line.variant.label)} × ${line.qty} • ${fmtRupiah(line.variant.price)}</span>
-            </div>
-            <div class="cart-line-total">${fmtRupiah(line.subtotal)}</div>
-          </div>
-        `).join("")}
+      <div class="empty-cart">
+        <div class="empty-cart-icon">🛒</div>
+        <h3>Keranjang masih kosong</h3>
+        <p>Silakan pilih menu terlebih dahulu.</p>
       </div>
-
-      <div class="sheet-summary">
-        <span>Total ${totalQty} item</span>
-        <strong>${fmtRupiah(totalPrice)}</strong>
-      </div>
-
-      <button class="sheet-order" id="sheetOrderBtn" type="button">
-        Lanjut Pesan via WhatsApp →
-      </button>
     `;
-
-    document.getElementById("sheetOrderBtn").addEventListener("click", checkoutWhatsApp);
+    return;
   }
 
-  function escapeHTML(value){
-    return String(value)
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
+  body.innerHTML = `
+    <div class="checkout-wrapper">
 
-  function openCartSheet(){
-    document.getElementById("sheetBackdrop").classList.add("open");
-    document.getElementById("cartSheet").classList.add("open");
-    document.body.style.overflow = "hidden";
-    renderCartSheet();
-  }
+      <div class="checkout-section">
 
-  function closeCartSheet(){
-    document.getElementById("sheetBackdrop").classList.remove("open");
-    document.getElementById("cartSheet").classList.remove("open");
-    document.body.style.overflow = "";
-  }
+        <div class="checkout-section-title">
+          <span class="checkout-number">1</span>
+          <div>
+            <strong>Pesanan</strong>
+            <small>Periksa menu yang kamu pilih</small>
+          </div>
+        </div>
 
-  /* =========================================================
-     WHATSAPP CHECKOUT
-  ========================================================= */
-  function buildWhatsAppMessage(){
-    const { lines, totalPrice } = getCartSummary();
+        <div class="checkout-items">
+          ${summary.lines.map((line) => `
+            <div class="checkout-item">
 
-    let linesText = [
-      "Halo Fidaa, saya mau pesan:",
-      ""
-    ];
+              <div class="checkout-item-info">
+                <strong>${escapeHTML(line.item.name)}</strong>
 
-    lines.forEach(line => {
-      linesText.push(
-        `- ${line.item.name} (${line.variant.label}) x${line.qty} = ${fmtRupiah(line.subtotal)}`
-      );
+                <span>
+                  ${escapeHTML(line.variant.label)}
+                  × ${line.qty}
+                </span>
+              </div>
+
+              <strong>
+                ${fmtRupiah(line.subtotal)}
+              </strong>
+
+            </div>
+          `).join("")}
+        </div>
+
+        <div class="checkout-total">
+          <span>Total</span>
+          <strong>${fmtRupiah(summary.totalPrice)}</strong>
+        </div>
+
+      </div>
+
+
+      <div class="checkout-section">
+
+        <div class="checkout-section-title">
+          <span class="checkout-number">2</span>
+
+          <div>
+            <strong>Data Pemesan</strong>
+            <small>Masukkan nama kamu</small>
+          </div>
+        </div>
+
+        <label class="checkout-label" for="checkoutName">
+          Nama
+        </label>
+
+        <input
+          id="checkoutName"
+          class="checkout-input"
+          type="text"
+          placeholder="Contoh: Fida"
+          autocomplete="name"
+        >
+
+      </div>
+
+
+      <div class="checkout-section">
+
+        <div class="checkout-section-title">
+          <span class="checkout-number">3</span>
+
+          <div>
+            <strong>Pengambilan Pesanan</strong>
+            <small>Pilih diantar atau ambil sendiri</small>
+          </div>
+        </div>
+
+        <div class="delivery-options">
+
+          <label class="delivery-option">
+
+            <input
+              type="radio"
+              name="deliveryMethod"
+              value="delivery"
+            >
+
+            <div class="delivery-option-content">
+
+              <div class="delivery-icon">
+                🚚
+              </div>
+
+              <div>
+                <strong>Diantar</strong>
+                <span>Pesanan dikirim ke lokasi kamu</span>
+              </div>
+
+            </div>
+
+          </label>
+
+
+          <label class="delivery-option">
+
+            <input
+              type="radio"
+              name="deliveryMethod"
+              value="pickup"
+            >
+
+            <div class="delivery-option-content">
+
+              <div class="delivery-icon">
+                🛍️
+              </div>
+
+              <div>
+                <strong>Ambil Sendiri</strong>
+                <span>Ambil pesanan langsung</span>
+              </div>
+
+            </div>
+
+          </label>
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="checkout-section checkout-address-section"
+        id="checkoutAddressSection"
+        hidden
+      >
+
+        <div class="checkout-section-title">
+          <span class="checkout-number">4</span>
+
+          <div>
+            <strong>Lokasi Pengantaran</strong>
+            <small>Alamat atau lokasi Google Maps</small>
+          </div>
+        </div>
+
+        <label
+          class="checkout-label"
+          for="checkoutAddress"
+        >
+          Alamat / Link Google Maps
+        </label>
+
+        <textarea
+          id="checkoutAddress"
+          class="checkout-input checkout-textarea"
+          rows="4"
+          placeholder="Masukkan alamat atau paste link Google Maps"
+        ></textarea>
+
+        <button
+          type="button"
+          class="location-btn"
+          id="useLocationBtn"
+        >
+          📍 Gunakan lokasi saya
+        </button>
+
+        <div
+          class="location-status"
+          id="locationStatus"
+          aria-live="polite"
+        ></div>
+
+        <p class="location-help">
+          Kamu juga bisa paste link lokasi Google Maps secara langsung.
+        </p>
+
+      </div>
+
+
+      <div class="checkout-section">
+
+        <div class="checkout-section-title">
+          <span class="checkout-number">5</span>
+
+          <div>
+            <strong>Catatan</strong>
+            <small>Opsional</small>
+          </div>
+        </div>
+
+        <textarea
+          id="checkoutNote"
+          class="checkout-input checkout-textarea"
+          rows="3"
+          placeholder="Contoh: tidak terlalu pedas, sambal dipisah, dll."
+        ></textarea>
+
+      </div>
+
+
+      <button
+        type="button"
+        class="checkout-submit"
+        id="checkoutSubmitBtn"
+      >
+        <span>Konfirmasi Pesanan</span>
+        <span>→</span>
+      </button>
+
+      <p class="checkout-secure-note">
+        Setelah dikonfirmasi, pesanan akan dibuka melalui WhatsApp.
+      </p>
+
+    </div>
+  `;
+
+  setupCheckoutEvents();
+}
+
+
+/* =========================================================
+   CHECKOUT EVENTS
+========================================================= */
+
+function setupCheckoutEvents() {
+  document
+    .querySelectorAll('input[name="deliveryMethod"]')
+    .forEach((input) => {
+
+      input.addEventListener("change", () => {
+        const section = document.getElementById(
+          "checkoutAddressSection"
+        );
+
+        if (!section) return;
+
+        section.hidden = input.value !== "delivery";
+      });
+
     });
 
-    linesText.push("");
-    linesText.push(`Total: ${fmtRupiah(totalPrice)}`);
-    linesText.push("");
-    linesText.push("Mohon info untuk konfirmasi pesanan ini ya, terima kasih 🙏");
 
-    return linesText.join("\n");
+  document
+    .getElementById("useLocationBtn")
+    ?.addEventListener(
+      "click",
+      detectUserLocation
+    );
+
+
+  document
+    .getElementById("checkoutSubmitBtn")
+    ?.addEventListener(
+      "click",
+      checkoutWhatsApp
+    );
+}
+
+
+/* =========================================================
+   GPS / GOOGLE MAPS
+========================================================= */
+
+function detectUserLocation() {
+  const address = document.getElementById("checkoutAddress");
+  const status = document.getElementById("locationStatus");
+  const button = document.getElementById("useLocationBtn");
+
+  if (!navigator.geolocation) {
+    status.textContent =
+      "Browser kamu tidak mendukung GPS.";
+    status.className =
+      "location-status error";
+    return;
   }
 
-  function checkoutWhatsApp(){
-    if(Object.keys(cart).length === 0){
-      openCartSheet();
-      return;
+  button.disabled = true;
+  button.textContent = "⏳ Mendeteksi lokasi...";
+
+  status.textContent =
+    "Meminta izin lokasi dari browser...";
+  status.className =
+    "location-status";
+
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      const { latitude, longitude } = coords;
+
+      const mapsUrl =
+        `https://www.google.com/maps?q=${latitude},${longitude}`;
+
+      address.value = mapsUrl;
+
+      status.innerHTML =
+        "✓ Lokasi berhasil dideteksi.";
+
+      status.className =
+        "location-status success";
+
+      button.disabled = false;
+      button.textContent =
+        "📍 Lokasi berhasil digunakan";
+    },
+
+    (error) => {
+      const messages = {
+        1: "Izin lokasi ditolak. Izinkan akses lokasi di browser.",
+        2: "Lokasi tidak tersedia. Pastikan GPS aktif.",
+        3: "Deteksi lokasi terlalu lama. Silakan coba lagi.",
+      };
+
+      status.textContent =
+        messages[error.code] ||
+        "Lokasi tidak dapat dideteksi.";
+
+      status.className =
+        "location-status error";
+
+      button.disabled = false;
+      button.textContent =
+        "📍 Gunakan lokasi saya";
+    },
+
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
     }
+  );
+}
 
-    const msg = buildWhatsAppMessage();
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
+
+/* =========================================================
+   WHATSAPP MESSAGE
+========================================================= */
+
+function buildWhatsAppMessage() {
+  const checkout = getCheckoutData();
+  const summary = getCartSummary();
+
+  let message =
+    "Halo Kedaii Fidaa 👋\n\n";
+
+  message +=
+    "Saya mau pesan:\n";
+
+  summary.lines.forEach((line) => {
+    message +=
+      `• ${line.item.name} (${line.variant.label}) x${line.qty} = ${fmtRupiah(line.subtotal)}\n`;
+  });
+
+  message +=
+    `\nTotal: ${fmtRupiah(summary.totalPrice)}\n`;
+
+  message +=
+    `Nama: ${checkout.name}\n`;
+
+  if (checkout.method === "delivery") {
+    message +=
+      "Metode: Diantar 🚚\n";
+
+    message +=
+      `Lokasi: ${checkout.address}\n`;
+  } else {
+    message +=
+      "Metode: Ambil Sendiri 🛍️\n";
   }
+
+  if (checkout.note) {
+    message +=
+      `Catatan: ${checkout.note}\n`;
+  }
+
+  message +=
+    "\nMohon dikonfirmasi ya. Terima kasih 🙏";
+
+  return message;
+}
+
+
+/* =========================================================
+   CHECKOUT → WHATSAPP
+========================================================= */
+
+function checkoutWhatsApp() {
+  const checkout = getCheckoutData();
+  const summary = getCartSummary();
+
+  if (!summary.lines.length) {
+    alert(
+      "Keranjang masih kosong. Silakan pilih makanan terlebih dahulu."
+    );
+    return;
+  }
+
+  if (!checkout.name) {
+    alert("Silakan masukkan nama terlebih dahulu.");
+
+    document
+      .getElementById("checkoutName")
+      ?.focus();
+
+    return;
+  }
+
+  if (!checkout.method) {
+    alert(
+      "Silakan pilih Diantar atau Ambil Sendiri."
+    );
+    return;
+  }
+
+  if (
+    checkout.method === "delivery" &&
+    !checkout.address
+  ) {
+    alert(
+      "Silakan masukkan alamat atau gunakan lokasi GPS."
+    );
+
+    document
+      .getElementById("checkoutAddress")
+      ?.focus();
+
+    return;
+  }
+
+  const message =
+    buildWhatsAppMessage();
+
+  const url =
+    `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+
+  window.open(
+    url,
+    "_blank",
+    "noopener,noreferrer"
+  );
+}
+
+
+/* =========================================================
+   CART SHEET
+========================================================= */
+
+function openCartSheet() {
+  const sheet = document.getElementById("cartSheet");
+  const backdrop = document.getElementById("sheetBackdrop");
+
+  if (!sheet || !backdrop) return;
+
+  renderCheckoutForm();
+
+  sheet.classList.add("open");
+  backdrop.classList.add("open");
+
+  document.body.classList.add("sheet-open");
+}
+
+function closeCartSheet() {
+  const sheet = document.getElementById("cartSheet");
+  const backdrop = document.getElementById("sheetBackdrop");
+
+  if (!sheet || !backdrop) return;
+
+  sheet.classList.remove("open");
+  backdrop.classList.remove("open");
+
+  document.body.classList.remove("sheet-open");
+}
