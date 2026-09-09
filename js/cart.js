@@ -243,7 +243,7 @@ const cart = {};
     const { lines, totalPrice } = getCartSummary();
 
     let linesText = [
-      "Halo Kedaii Fidaa, saya mau pesan:",
+      "Halo Fidaa, saya mau pesan:",
       ""
     ];
 
